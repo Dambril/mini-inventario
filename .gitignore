@@ -22,6 +22,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 
+# Instrucciones locales de Claude
+CLAUDE.md
+
 # Sistema / editores
 .DS_Store
 Thumbs.db
