@@ -29,3 +29,15 @@ Proyecto de inventario sencillo.
    git status
    git log --oneline
    ```
+
+## Ejecutar la aplicación
+
+```bash
+npm install
+npm start          # empaqueta Zod para el navegador y abre http://localhost:3000
+npm test           # pruebas con node:test
+```
+
+- El puerto se toma de `PORT` (por defecto, 3000). `GET /health` responde `{"status":"ok"}`.
+- Por ahora los datos se guardan en el `localStorage` del navegador. Todo el acceso a datos está en `public/productos.js`, que se reemplazará por Supabase (ver `docs/diseno.md`).
+- Aún no hay inicio de sesión.
