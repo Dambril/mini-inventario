@@ -72,6 +72,41 @@ function mostrarErrorDeDatos(form, error) {
   mostrarErrores(form, { [campo]: mensajeDeError(error) });
 }
 
+// Lo escrito en el alta sobrevive a una recarga. Es comodidad de la interfaz, no
+// datos del inventario, por eso no pasa por productos.js.
+const CLAVE_BORRADOR = 'superdami.borrador.alta';
+
+function guardarBorrador() {
+  try {
+    localStorage.setItem(CLAVE_BORRADOR, JSON.stringify(Object.fromEntries(new FormData(formAlta))));
+  } catch {
+    // Sin almacenamiento (ventana privada, cuota llena): el borrador no se guarda.
+  }
+}
+
+function restaurarBorrador() {
+  try {
+    const borrador = JSON.parse(localStorage.getItem(CLAVE_BORRADOR));
+    if (!borrador || typeof borrador !== 'object') return;
+    for (const [campo, valor] of Object.entries(borrador)) {
+      const input = formAlta.elements.namedItem(campo);
+      if (input && typeof valor === 'string') input.value = valor;
+    }
+  } catch {
+    // Borrador ilegible: se empieza con el formulario vacío.
+  }
+}
+
+function borrarBorrador() {
+  try {
+    localStorage.removeItem(CLAVE_BORRADOR);
+  } catch {
+    // Nada que borrar si no hay almacenamiento.
+  }
+}
+
+formAlta.addEventListener('input', guardarBorrador);
+
 formAlta.addEventListener('submit', async (evento) => {
   evento.preventDefault();
   limpiarMensajes(formAlta);
@@ -81,6 +116,7 @@ formAlta.addEventListener('submit', async (evento) => {
   try {
     const creado = await productos.crearProducto(resultado.datos);
     formAlta.reset();
+    borrarBorrador();
     mostrarEstado(formAlta, `Se agregó «${creado.nombre}».`);
     $('#alta-nombre').focus();
     await pintarListas();
@@ -252,6 +288,7 @@ dialogo.addEventListener('close', () => {
 
 // --- Inicio -----------------------------------------------------------------------
 
+restaurarBorrador();
 mostrarPestana(location.hash === '#bajo-minimo' ? 'bajo-minimo' : 'todos');
 pintarListas().catch((error) => {
   $('[data-error-de="_"]', formAlta).textContent = mensajeDeError(error);
