@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Super Dami · Inventario</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/css/estilos.css">
+  <script type="importmap">{ "imports": { "zod": "/vendor/zod.mjs" } }</script>
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <header class="cabecera">
+    <h1>Super Dami <span>Mini Inventario</span></h1>
+  </header>
+
+  <main>
+    <section class="tarjeta" aria-labelledby="titulo-alta">
+      <h2 id="titulo-alta">Agregar producto</h2>
+      <form id="form-alta" class="form-rejilla" novalidate>
+        <div class="campo">
+          <label for="alta-nombre">Nombre</label>
+          <input id="alta-nombre" name="nombre" maxlength="100" required autocomplete="off">
+          <p class="error" data-error-de="nombre"></p>
+        </div>
+        <div class="campo">
+          <label for="alta-sku">SKU</label>
+          <input id="alta-sku" name="sku" maxlength="50" required autocomplete="off">
+          <p class="error" data-error-de="sku"></p>
+        </div>
+        <div class="campo">
+          <label for="alta-cantidad">Cantidad inicial</label>
+          <input id="alta-cantidad" name="cantidad" type="number" min="0" step="1" inputmode="numeric" required>
+          <p class="error" data-error-de="cantidad"></p>
+        </div>
+        <div class="campo">
+          <label for="alta-minimo">Cantidad mínima</label>
+          <input id="alta-minimo" name="minimo" type="number" min="0" step="1" inputmode="numeric" required>
+          <p class="error" data-error-de="minimo"></p>
+        </div>
+        <div class="acciones">
+          <button type="submit" class="primario">Agregar</button>
+          <p class="error" data-error-de="_" role="alert"></p>
+          <p class="aviso" data-estado role="status"></p>
+        </div>
+      </form>
+    </section>
+
+    <section class="tarjeta">
+      <div class="pestanas" role="tablist" aria-label="Vistas del inventario">
+        <button type="button" role="tab" id="tab-todos" aria-controls="vista-todos" aria-selected="true">Todos los productos</button>
+        <button type="button" role="tab" id="tab-bajo-minimo" aria-controls="vista-bajo-minimo" aria-selected="false">
+          Bajo mínimo <span class="contador" id="contador-bajo-minimo"></span>
+        </button>
+      </div>
+
+      <div id="vista-todos" role="tabpanel" aria-labelledby="tab-todos">
+        <p class="vacio" id="lista-vacia" hidden>Aún no hay productos. Agrega el primero arriba.</p>
+        <div class="tabla-envoltura">
+          <table id="tabla-productos" hidden>
+            <thead>
+              <tr><th>Nombre</th><th>SKU</th><th class="num">Cantidad</th><th class="num">Mínimo</th><th>Estado</th><th><span class="sr">Acciones</span></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="vista-bajo-minimo" role="tabpanel" aria-labelledby="tab-bajo-minimo" hidden>
+        <p class="vacio todo-bien" id="bajo-minimo-vacio" hidden>Todo en orden: ningún producto bajo el mínimo</p>
+        <div class="tabla-envoltura">
+          <table id="tabla-bajo-minimo" hidden>
+            <thead>
+              <tr><th>Nombre</th><th>SKU</th><th class="num">Cantidad</th><th class="num">Mínimo</th><th class="num">Faltan</th><th><span class="sr">Acciones</span></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="dialogo-producto" aria-labelledby="dialogo-titulo">
+    <div class="dialogo-cabecera">
+      <h2 id="dialogo-titulo">Producto</h2>
+      <button type="button" class="cerrar" data-cerrar aria-label="Cerrar">×</button>
+    </div>
+
+    <p class="error" id="dialogo-error" role="alert"></p>
+
+    <div id="dialogo-cuerpo">
+      <p class="stock">Cantidad actual: <strong id="dialogo-cantidad"></strong> <span id="dialogo-etiqueta"></span></p>
+
+      <form id="form-edicion" novalidate>
+        <h3>Editar datos</h3>
+        <div class="form-rejilla">
+          <div class="campo">
+            <label for="edicion-nombre">Nombre</label>
+            <input id="edicion-nombre" name="nombre" maxlength="100" required autocomplete="off">
+            <p class="error" data-error-de="nombre"></p>
+          </div>
+          <div class="campo">
+            <label for="edicion-sku">SKU</label>
+            <input id="edicion-sku" name="sku" maxlength="50" required autocomplete="off">
+            <p class="error" data-error-de="sku"></p>
+          </div>
+          <div class="campo">
+            <label for="edicion-minimo">Cantidad mínima</label>
+            <input id="edicion-minimo" name="minimo" type="number" min="0" step="1" inputmode="numeric" required>
+            <p class="error" data-error-de="minimo"></p>
+          </div>
+        </div>
+        <p class="ayuda">La cantidad no se edita aquí: se ajusta con entradas y salidas.</p>
+        <div class="acciones">
+          <button type="submit" class="primario">Guardar cambios</button>
+          <p class="error" data-error-de="_" role="alert"></p>
+          <p class="aviso" data-estado role="status"></p>
+        </div>
+      </form>
+
+      <form id="form-movimiento" novalidate>
+        <h3>Registrar entrada o salida</h3>
+        <div class="form-rejilla">
+          <div class="campo">
+            <label for="movimiento-tipo">Tipo</label>
+            <select id="movimiento-tipo" name="tipo">
+              <option value="entrada">Entrada</option>
+              <option value="salida">Salida</option>
+            </select>
+            <p class="error" data-error-de="tipo"></p>
+          </div>
+          <div class="campo">
+            <label for="movimiento-unidades">Unidades</label>
+            <input id="movimiento-unidades" name="unidades" type="number" min="1" step="1" inputmode="numeric" required>
+            <p class="error" data-error-de="unidades"></p>
+          </div>
+          <div class="campo campo-ancho">
+            <label for="movimiento-nota">Nota (opcional)</label>
+            <input id="movimiento-nota" name="nota" maxlength="200" autocomplete="off">
+            <p class="error" data-error-de="nota"></p>
+          </div>
+        </div>
+        <div class="acciones">
+          <button type="submit" class="primario">Registrar</button>
+          <p class="error" data-error-de="_" role="alert"></p>
+          <p class="aviso" data-estado role="status"></p>
+        </div>
+      </form>
+
+      <section aria-labelledby="titulo-historial">
+        <h3 id="titulo-historial">Historial</h3>
+        <div class="tabla-envoltura">
+          <table id="tabla-historial">
+            <thead>
+              <tr><th>Fecha y hora</th><th>Tipo</th><th class="num">Unidades</th><th>Nota</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </dialog>
+</body>
+</html>

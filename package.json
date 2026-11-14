@@ -1,0 +1,23 @@
+{
+  "name": "mini-inventario",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mini Inventario \"Super Dami\"",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:vendor": "esbuild node_modules/zod/index.js --bundle --format=esm --minify --log-level=warning --outfile=vendor/zod.mjs",
+    "prestart": "npm run build:vendor",
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "5.1.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
