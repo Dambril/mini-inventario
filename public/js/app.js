@@ -1,10 +1,16 @@
-// Interfaz de la página. No toca localStorage: todo pasa por /productos.js.
+// Interfaz de la página. Los datos del inventario pasan por /productos.js y la
+// sesión por sesion.js; aquí no se habla con Supabase directamente.
 import * as productos from '/productos.js';
-import { validar, productoNuevo, productoEdicion, movimiento, idProducto } from './esquemas.js';
+import { supabase } from './cliente.js';
+import { registrar, iniciarSesion, cerrarSesion, vigilarSesion } from './sesion.js';
+import { validar, credenciales, productoNuevo, productoEdicion, movimiento, idProducto } from './esquemas.js';
 import { mensajeDeError } from './errores.js';
+
+productos.usarCliente(supabase);
 
 const $ = (selector, raiz = document) => raiz.querySelector(selector);
 
+const formAcceso = $('#form-acceso');
 const formAlta = $('#form-alta');
 const formEdicion = $('#form-edicion');
 const formMovimiento = $('#form-movimiento');
@@ -66,10 +72,90 @@ function mostrarEstado(form, mensaje) {
   $('[data-estado]', form).textContent = mensaje;
 }
 
-// Errores de la capa de datos: el de SKU va junto a su campo.
+// Errores de la capa de datos o de Auth que van junto a su campo.
+const CAMPO_DEL_ERROR = {
+  SKU_DUPLICADO: 'sku',
+  user_already_exists: 'email',
+  email_exists: 'email',
+  email_address_invalid: 'email',
+  weak_password: 'password',
+};
+
 function mostrarErrorDeDatos(form, error) {
-  const campo = error?.code === 'SKU_DUPLICADO' ? 'sku' : '_';
+  const campo = CAMPO_DEL_ERROR[error?.code] ?? '_';
   mostrarErrores(form, { [campo]: mensajeDeError(error) });
+}
+
+// --- Sesión ------------------------------------------------------------------------
+
+// Un botón envía "entrar" y el otro "registrar"; los dos usan los mismos campos.
+formAcceso.addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  limpiarMensajes(formAcceso);
+  const resultado = validar(credenciales, leerFormulario(formAcceso));
+  if (!resultado.ok) return mostrarErrores(formAcceso, resultado.errores);
+
+  const botones = formAcceso.querySelectorAll('button');
+  for (const boton of botones) boton.disabled = true;
+  try {
+    if (evento.submitter?.value === 'registrar') {
+      const { confirmarCorreo } = await registrar(resultado.datos);
+      if (confirmarCorreo) mostrarEstado(formAcceso, 'Te enviamos un correo para confirmar la cuenta.');
+    } else {
+      await iniciarSesion(resultado.datos);
+    }
+    // Si hay sesión nueva, vigilarSesion cambia de pantalla.
+  } catch (error) {
+    mostrarErrorDeDatos(formAcceso, error);
+  } finally {
+    for (const boton of botones) boton.disabled = false;
+  }
+});
+
+$('#cerrar-sesion').addEventListener('click', async () => {
+  try {
+    await cerrarSesion();
+  } catch (error) {
+    // La sesión local se borra aunque falle el servidor; solo queda constancia.
+    console.error(error);
+  }
+});
+
+let usuariaActual;
+
+function mostrarPantalla(id) {
+  for (const pantalla of ['cargando', 'acceso', 'inventario']) $(`#${pantalla}`).hidden = pantalla !== id;
+}
+
+async function alCambiarSesion(usuaria) {
+  // La sesión se renueva sola cada hora; solo importa si cambió la persona.
+  if (usuaria?.id === usuariaActual?.id && usuariaActual !== undefined) return;
+  usuariaActual = usuaria;
+
+  if (dialogo.open) dialogo.close();
+  $('#usuaria').hidden = !usuaria;
+  $('#usuaria-correo').textContent = usuaria?.email ?? '';
+
+  if (!usuaria) {
+    // En un equipo compartido, lo de una cuenta no debe verse en la siguiente.
+    formAlta.reset();
+    limpiarMensajes(formAlta);
+    borrarBorrador();
+    for (const tabla of ['#tabla-productos', '#tabla-bajo-minimo']) $(`${tabla} tbody`).replaceChildren();
+    formAcceso.elements.password.value = '';
+    mostrarPantalla('acceso');
+    return;
+  }
+
+  limpiarMensajes(formAcceso);
+  formAcceso.reset();
+  restaurarBorrador();
+  mostrarPantalla('inventario');
+  try {
+    await pintarListas();
+  } catch (error) {
+    $('[data-error-de="_"]', formAlta).textContent = mensajeDeError(error);
+  }
 }
 
 // Lo escrito en el alta sobrevive a una recarga. Es comodidad de la interfaz, no
@@ -288,8 +374,5 @@ dialogo.addEventListener('close', () => {
 
 // --- Inicio -----------------------------------------------------------------------
 
-restaurarBorrador();
 mostrarPestana(location.hash === '#bajo-minimo' ? 'bajo-minimo' : 'todos');
-pintarListas().catch((error) => {
-  $('[data-error-de="_"]', formAlta).textContent = mensajeDeError(error);
-});
+vigilarSesion(alCambiarSesion);

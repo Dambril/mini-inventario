@@ -6,15 +6,49 @@
   <title>Super Dami · Inventario</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/css/estilos.css">
-  <script type="importmap">{ "imports": { "zod": "/vendor/zod.mjs" } }</script>
+  <script type="importmap">{ "imports": { "zod": "/vendor/zod.mjs", "@supabase/supabase-js": "/vendor/supabase.mjs" } }</script>
   <script type="module" src="/js/app.js"></script>
 </head>
 <body>
   <header class="cabecera">
-    <h1>Super Dami <span>Mini Inventario</span></h1>
+    <div class="cabecera-contenido">
+      <h1>Super Dami <span>Mini Inventario</span></h1>
+      <div class="usuaria" id="usuaria" hidden>
+        <span id="usuaria-correo"></span>
+        <button type="button" id="cerrar-sesion">Cerrar sesión</button>
+      </div>
+    </div>
   </header>
 
-  <main>
+  <main id="cargando">
+    <p class="vacio" role="status">Cargando…</p>
+  </main>
+
+  <main id="acceso" hidden>
+    <section class="tarjeta tarjeta-acceso" aria-labelledby="titulo-acceso">
+      <h2 id="titulo-acceso">Entra a tu inventario</h2>
+      <form id="form-acceso" novalidate>
+        <div class="campo">
+          <label for="acceso-email">Correo</label>
+          <input id="acceso-email" name="email" type="email" required autocomplete="email">
+          <p class="error" data-error-de="email"></p>
+        </div>
+        <div class="campo">
+          <label for="acceso-password">Contraseña</label>
+          <input id="acceso-password" name="password" type="password" minlength="8" maxlength="72" required autocomplete="current-password">
+          <p class="error" data-error-de="password"></p>
+        </div>
+        <div class="acciones">
+          <button type="submit" class="primario" value="entrar">Iniciar sesión</button>
+          <button type="submit" value="registrar">Crear cuenta</button>
+          <p class="error" data-error-de="_" role="alert"></p>
+          <p class="aviso" data-estado role="status"></p>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <main id="inventario" hidden>
     <section class="tarjeta" aria-labelledby="titulo-alta">
       <h2 id="titulo-alta">Agregar producto</h2>
       <form id="form-alta" class="form-rejilla" novalidate>

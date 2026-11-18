@@ -1,19 +1,38 @@
-import { test, beforeEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as productos from '../public/productos.js';
 
-// localStorage falso en memoria.
-function almacenFalso() {
-  const datos = new Map();
-  return {
-    getItem: (clave) => (datos.has(clave) ? datos.get(clave) : null),
-    setItem: (clave, valor) => datos.set(clave, String(valor)),
+// Cliente de Supabase falso: anota cada llamada y responde siempre `respuesta`.
+// Las reglas reales (RLS, SKU único, stock) se prueban contra la base de datos.
+function clienteFalso(respuesta) {
+  const llamadas = [];
+  const consulta = new Proxy(
+    {},
+    {
+      get(_, metodo) {
+        if (metodo === 'then') return (ok, mal) => Promise.resolve(respuesta).then(ok, mal);
+        return (...args) => {
+          llamadas.push([metodo, ...args]);
+          return consulta;
+        };
+      },
+    },
+  );
+  const cliente = {
+    from: (tabla) => {
+      llamadas.push(['from', tabla]);
+      return consulta;
+    },
+    rpc: (funcion, args) => {
+      llamadas.push(['rpc', funcion, args]);
+      return Promise.resolve(respuesta);
+    },
   };
+  productos.usarCliente(cliente);
+  return llamadas;
 }
 
-beforeEach(() => productos.usarAlmacen(almacenFalso()));
-
-const cafe = { nombre: 'Café', sku: 'CAF-1', cantidad: 10, minimo: 3 };
+const llamada = (llamadas, metodo) => llamadas.find(([m]) => m === metodo);
 
 async function codigoDe(promesa) {
   try {
@@ -24,96 +43,72 @@ async function codigoDe(promesa) {
   return null;
 }
 
-test('crea y lista un producto con exactamente sus valores', async () => {
-  const creado = await productos.crearProducto(cafe);
-  const lista = await productos.listarProductos();
-  assert.equal(lista.length, 1);
-  assert.deepEqual(lista[0], creado);
-  assert.deepEqual({ ...lista[0], id: undefined, created_at: undefined }, { ...cafe, id: undefined, created_at: undefined });
+const cafe = { nombre: 'Café', sku: 'CAF-1', cantidad: 10, minimo: 3 };
+const ID = '00000000-0000-4000-8000-000000000001';
+
+test('crear inserta solo los cuatro campos y devuelve el producto', async () => {
+  const guardado = { id: ID, ...cafe, created_at: '2026-11-17T00:00:00Z' };
+  const llamadas = clienteFalso({ data: guardado, error: null });
+  assert.deepEqual(await productos.crearProducto({ ...cafe, user_id: 'otra' }), guardado);
+  assert.deepEqual(llamada(llamadas, 'from'), ['from', 'productos']);
+  assert.deepEqual(llamada(llamadas, 'insert'), ['insert', cafe]);
 });
 
-test('el SKU es único sin distinguir mayúsculas ni espacios', async () => {
-  await productos.crearProducto(cafe);
-  assert.equal(await codigoDe(productos.crearProducto({ ...cafe, sku: ' caf-1 ' })), 'SKU_DUPLICADO');
-  assert.equal((await productos.listarProductos()).length, 1);
+test('un SKU repetido (23505) da SKU_DUPLICADO', async () => {
+  clienteFalso({ data: null, error: { code: '23505', message: 'duplicate key' } });
+  assert.equal(await codigoDe(productos.crearProducto(cafe)), 'SKU_DUPLICADO');
+  assert.equal(await codigoDe(productos.editarProducto(ID, cafe)), 'SKU_DUPLICADO');
 });
 
-test('editar cambia nombre, SKU y mínimo, pero nunca la cantidad', async () => {
-  const { id } = await productos.crearProducto(cafe);
-  await productos.editarProducto(id, { nombre: 'Café molido', sku: 'CAF-2', minimo: 12, cantidad: 999 });
-  const editado = await productos.obtenerProducto(id);
-  assert.equal(editado.nombre, 'Café molido');
-  assert.equal(editado.sku, 'CAF-2');
-  assert.equal(editado.minimo, 12);
-  assert.equal(editado.cantidad, 10);
-  assert.ok(productos.estaBajoMinimo(editado));
+test('editar envía nombre, SKU y mínimo, nunca la cantidad', async () => {
+  const llamadas = clienteFalso({ data: { id: ID, ...cafe }, error: null });
+  await productos.editarProducto(ID, { nombre: 'Café molido', sku: 'CAF-2', minimo: 12, cantidad: 999 });
+  assert.deepEqual(llamada(llamadas, 'update'), ['update', { nombre: 'Café molido', sku: 'CAF-2', minimo: 12 }]);
+  assert.deepEqual(llamada(llamadas, 'eq'), ['eq', 'id', ID]);
 });
 
-test('editar puede conservar su propio SKU pero no tomar el de otro', async () => {
-  const a = await productos.crearProducto(cafe);
-  await productos.crearProducto({ ...cafe, sku: 'TE-1' });
-  await productos.editarProducto(a.id, { nombre: 'Otro', sku: 'caf-1', minimo: 3 });
-  assert.equal(await codigoDe(productos.editarProducto(a.id, { nombre: 'X', sku: 'te-1', minimo: 3 })), 'SKU_DUPLICADO');
+test('sin filas (inexistente o de otra persona) da NO_ENCONTRADO', async () => {
+  clienteFalso({ data: null, error: null });
+  assert.equal(await codigoDe(productos.obtenerProducto(ID)), 'NO_ENCONTRADO');
+  assert.equal(await codigoDe(productos.editarProducto(ID, cafe)), 'NO_ENCONTRADO');
 });
 
-test('un id inexistente da NO_ENCONTRADO', async () => {
-  const id = crypto.randomUUID();
-  assert.equal(await codigoDe(productos.obtenerProducto(id)), 'NO_ENCONTRADO');
-  assert.equal(await codigoDe(productos.editarProducto(id, { nombre: 'A', sku: 'B', minimo: 1 })), 'NO_ENCONTRADO');
-  assert.equal(
-    await codigoDe(productos.registrarMovimiento({ producto_id: id, tipo: 'entrada', unidades: 1 })),
-    'NO_ENCONTRADO',
-  );
+test('registrar un movimiento llama a la función y devuelve la nueva cantidad', async () => {
+  const llamadas = clienteFalso({ data: 15, error: null });
+  assert.equal(await productos.registrarMovimiento({ producto_id: ID, tipo: 'entrada', unidades: 5 }), 15);
+  assert.deepEqual(llamada(llamadas, 'rpc'), [
+    'rpc',
+    'registrar_movimiento',
+    { producto_id: ID, tipo: 'entrada', unidades: 5, nota: null },
+  ]);
 });
 
-test('entradas suman, salidas restan y una salida excesiva no cambia nada', async () => {
-  const { id } = await productos.crearProducto(cafe);
-  assert.equal(await productos.registrarMovimiento({ producto_id: id, tipo: 'entrada', unidades: 5, nota: 'compra' }), 15);
-  assert.equal(await productos.registrarMovimiento({ producto_id: id, tipo: 'salida', unidades: 15 }), 0);
-  assert.equal(
-    await codigoDe(productos.registrarMovimiento({ producto_id: id, tipo: 'salida', unidades: 1 })),
-    'STOCK_INSUFICIENTE',
-  );
-  assert.equal((await productos.obtenerProducto(id)).cantidad, 0);
-  assert.equal((await productos.listarMovimientos(id)).length, 3);
+for (const codigo of ['STOCK_INSUFICIENTE', 'NO_ENCONTRADO']) {
+  test(`el error ${codigo} de la función conserva su código`, async () => {
+    clienteFalso({ data: null, error: { code: 'P0001', message: codigo } });
+    assert.equal(
+      await codigoDe(productos.registrarMovimiento({ producto_id: ID, tipo: 'salida', unidades: 1 })),
+      codigo,
+    );
+  });
+}
+
+test('cualquier otro error da SUPABASE y guarda el original', async () => {
+  const original = { code: '42501', message: 'permission denied' };
+  clienteFalso({ data: null, error: original });
+  const error = await productos.listarProductos().catch((e) => e);
+  assert.equal(error.code, 'SUPABASE');
+  assert.equal(error.cause, original);
 });
 
-test('rechaza unidades no positivas y tipos inválidos', async () => {
-  const { id } = await productos.crearProducto(cafe);
-  for (const datos of [{ tipo: 'entrada', unidades: 0 }, { tipo: 'entrada', unidades: 1.5 }, { tipo: 'inicial', unidades: 1 }]) {
-    assert.equal(await codigoDe(productos.registrarMovimiento({ producto_id: id, ...datos })), 'DATOS_INVALIDOS');
-  }
-  assert.equal((await productos.listarMovimientos(id)).length, 1);
+test('el historial se pide del más reciente al más antiguo', async () => {
+  const llamadas = clienteFalso({ data: [], error: null });
+  await productos.listarMovimientos(ID);
+  assert.deepEqual(llamada(llamadas, 'from'), ['from', 'movimientos']);
+  assert.deepEqual(llamada(llamadas, 'order'), ['order', 'created_at', { ascending: false }]);
 });
 
-test('el historial va del más reciente al más antiguo y cuadra con la cantidad', async () => {
-  const { id } = await productos.crearProducto(cafe);
-  await productos.registrarMovimiento({ producto_id: id, tipo: 'entrada', unidades: 4 });
-  await productos.registrarMovimiento({ producto_id: id, tipo: 'salida', unidades: 7, nota: 'venta' });
-
-  const historial = await productos.listarMovimientos(id);
-  assert.deepEqual(historial.map((m) => m.tipo), ['salida', 'entrada', 'inicial']);
-  assert.equal(historial[0].nota, 'venta');
-
-  const suma = historial.reduce((total, m) => total + (m.tipo === 'salida' ? -m.unidades : m.unidades), 0);
-  assert.equal(suma, (await productos.obtenerProducto(id)).cantidad);
-});
-
-test('bajo mínimo: cantidad 5 / mínimo 5 aparece, 6 / 5 no', async () => {
-  assert.deepEqual(await productos.listarBajoMinimo(), []);
-  const justo = await productos.crearProducto({ nombre: 'A', sku: 'A', cantidad: 5, minimo: 5 });
-  await productos.crearProducto({ nombre: 'B', sku: 'B', cantidad: 6, minimo: 5 });
-
-  const bajo = await productos.listarBajoMinimo();
-  assert.deepEqual(bajo, [{ id: justo.id, nombre: 'A', sku: 'A', cantidad: 5, minimo: 5, faltan: 1 }]);
-
-  await productos.registrarMovimiento({ producto_id: justo.id, tipo: 'entrada', unidades: 1 });
-  assert.deepEqual(await productos.listarBajoMinimo(), []);
-});
-
-test('datos guardados corruptos no rompen la lectura', async () => {
-  const almacen = almacenFalso();
-  almacen.setItem('superdami.inventario', '{no es json');
-  productos.usarAlmacen(almacen);
-  assert.deepEqual(await productos.listarProductos(), []);
+test('bajo mínimo: cantidad 5 / mínimo 5 sí, 6 / 5 no', () => {
+  assert.equal(productos.estaBajoMinimo({ cantidad: 5, minimo: 5 }), true);
+  assert.equal(productos.estaBajoMinimo({ cantidad: 6, minimo: 5 }), false);
 });

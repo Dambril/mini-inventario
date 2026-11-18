@@ -42,6 +42,19 @@ const entero = (min, mensajeMin) =>
       .max(LIMITES.entero, 'El número es demasiado grande'),
   );
 
+// La contraseña no se recorta: los espacios cuentan. 72 es el límite de bcrypt.
+export const credenciales = z.strictObject({
+  email: z.preprocess(
+    limpiarTexto,
+    z.email({ error: (iss) => (iss.input === undefined ? OBLIGATORIO : 'Escribe un correo válido') }),
+  ),
+  password: z
+    .string({ error: OBLIGATORIO })
+    .min(1, OBLIGATORIO)
+    .min(8, 'La contraseña debe tener al menos 8 caracteres')
+    .max(72, 'La contraseña admite como máximo 72 caracteres'),
+});
+
 export const productoNuevo = z.strictObject({
   nombre: texto(LIMITES.nombre),
   sku: texto(LIMITES.sku),

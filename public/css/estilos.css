@@ -239,3 +239,25 @@ dialog::backdrop { background: rgb(0 0 0 / 0.45); }
 }
 
 [hidden] { display: none !important; }
+
+/* Sesión */
+.cabecera-contenido {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.cabecera-contenido h1 { margin: 0; }
+.usuaria {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+.tarjeta-acceso { width: 100%; max-width: 420px; justify-self: center; }
+#form-acceso { display: grid; gap: 4px; }

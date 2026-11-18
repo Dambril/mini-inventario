@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validar, productoNuevo, productoEdicion, movimiento, idProducto, LIMITES } from '../public/js/esquemas.js';
+import { validar, credenciales, productoNuevo, productoEdicion, movimiento, idProducto, LIMITES } from '../public/js/esquemas.js';
 
 const valido = { nombre: 'Café 500 g', sku: 'CAF-500', cantidad: '10', minimo: '3' };
 
@@ -80,4 +80,22 @@ test('idProducto rechaza un uuid inválido', () => {
   const r = validar(idProducto, 'no-es-uuid');
   assert.equal(r.ok, false);
   assert.equal(r.errores._, 'Producto no encontrado');
+});
+
+test('credenciales: correo recortado y contraseña de 8 a 72 caracteres', () => {
+  assert.deepEqual(validar(credenciales, { email: '  dami@ejemplo.com ', password: '12345678' }), {
+    ok: true,
+    datos: { email: 'dami@ejemplo.com', password: '12345678' },
+  });
+  assert.equal(validar(credenciales, { email: 'dami@ejemplo.com', password: 'a'.repeat(72) }).ok, true);
+});
+
+test('credenciales: rechaza correo inválido, contraseña corta, larga o vacía', () => {
+  const ok = { email: 'dami@ejemplo.com', password: '12345678' };
+  assert.equal(validar(credenciales, { ...ok, email: 'dami' }).errores.email, 'Escribe un correo válido');
+  assert.equal(validar(credenciales, { ...ok, email: '' }).errores.email, 'Este campo es obligatorio');
+  assert.equal(validar(credenciales, { ...ok, password: '' }).errores.password, 'Este campo es obligatorio');
+  assert.equal(validar(credenciales, { ...ok, password: '1234567' }).errores.password, 'La contraseña debe tener al menos 8 caracteres');
+  assert.equal(validar(credenciales, { ...ok, password: 'a'.repeat(73) }).errores.password, 'La contraseña admite como máximo 72 caracteres');
+  assert.equal(validar(credenciales, { ...ok, extra: 1 }).errores.extra, 'Este campo no se puede enviar');
 });
