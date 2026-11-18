@@ -35,3 +35,5 @@ Thumbs.db
 vendor/
 
 .claude/settings.local.json
+
+.playwright-cli
