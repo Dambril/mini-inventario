@@ -1,0 +1,24 @@
+{
+  "name": "mini-inventario",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mini Inventario \"Super Dami\"",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:vendor": "esbuild zod=node_modules/zod/index.js supabase=node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=esm --minify --log-level=warning --outdir=vendor --out-extension:.js=.mjs",
+    "prestart": "npm run build:vendor",
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.119.0",
+    "express": "5.1.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

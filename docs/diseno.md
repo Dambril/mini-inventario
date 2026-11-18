@@ -25,7 +25,7 @@ Navegador (HTML + JS sin framework)
 ```
 server.js                     Express: estáticos, /config.js, cabeceras de seguridad
 package.json                  dependencias: express, @supabase/supabase-js, zod
-.env.example                  SUPABASE_URL, SUPABASE_ANON_KEY, PORT (sin valores reales)
+.env.example                  SUPABASE_URL, SUPABASE_KEY, PORT (sin valores reales)
 public/
   index.html                  inicio de sesión y registro (HU1)
   inventario.html             lista de productos y alta (HU2, HU5)
@@ -47,7 +47,7 @@ Las librerías supabase-js y Zod se instalan con npm y Express las sirve desde `
 
 ## 3. Configuración y secretos
 
-- `SUPABASE_URL` y `SUPABASE_ANON_KEY` se leen de `.env` con `node --env-file=.env server.js`. `.env` ya está en `.gitignore`, y en el repositorio solo se sube `.env.example`.
+- `SUPABASE_URL` y `SUPABASE_KEY` (publishable o anon) se leen de `.env` al arrancar `server.js`, que se niega a arrancar si la llave es la secret o la service_role. `.env` ya está en `.gitignore`, y en el repositorio solo se sube `.env.example`.
 - La *anon key* es pública por diseño (llega al navegador); lo que protege los datos es RLS.
 - **La `service_role` key no se usa en este proyecto**, y por tanto nunca va en `.env` ni llega al navegador.
 - En Supabase Auth: el proveedor *Email* activado, una longitud mínima de contraseña de 8 y la opción *Confirm email* **desactivada**. Esto último es necesario porque HU1-1 pide quedar con la sesión iniciada justo al registrarse y HU1-2 pide avisar si el correo ya existe; con la confirmación activada, Supabase oculta esa información.
@@ -121,12 +121,14 @@ create view productos_bajo_minimo with (security_invoker = true) as
 
 | Tabla | select | insert | update | delete |
 |---|---|---|---|---|
-| `productos` | `user_id = auth.uid()` | `user_id = auth.uid()` | solo `nombre`, `sku`, `minimo`, y solo en sus filas | sin permiso (fuera de alcance) |
+| `productos` | `user_id = auth.uid()` | `user_id = auth.uid()` | solo `nombre`, `sku`, `minimo`, y solo en sus filas | `user_id = auth.uid()` |
 | `movimientos` | `user_id = auth.uid()` | sin permiso (solo trigger y función) | sin permiso | sin permiso |
 
 - Se activa RLS en ambas tablas.
 - El rol `authenticated` recibe `grant update (nombre, sku, minimo) on productos`, sin la columna `cantidad`. Así HU3-3 se cumple también en la base de datos y no solo en el formulario.
 - Se revoca todo al rol `anon`, de modo que sin sesión no se lee nada.
+- Las políticas de `productos` son una por operación (select, insert, update, delete), todas `to authenticated` con `(select auth.uid()) = user_id`; la de update lleva además `with check` para que nadie reasigne un producto a otra persona. El rol `authenticated` recibe `grant delete` sobre `productos`.
+- Al borrar un producto, su historial de `movimientos` se borra en cascada (la cascada la ejecuta Postgres, no requiere permiso de delete sobre `movimientos`).
 
 ## 5. Validación de esquemas con Zod
 
@@ -235,4 +237,4 @@ En todos los flujos, primero se ejecuta `validar(esquema, datos)` y solo se llam
 
 ## 9. Fuera de alcance
 
-Eliminar productos, buscar y filtrar, recuperar la contraseña, confirmar el correo, inventarios compartidos y despliegue. El despliegue requiere aprobación explícita, como indica el CLAUDE.md.
+Buscar y filtrar, recuperar la contraseña, confirmar el correo, inventarios compartidos y despliegue. El despliegue requiere aprobación explícita, como indica el CLAUDE.md.

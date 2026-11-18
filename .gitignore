@@ -30,3 +30,8 @@ CLAUDE.md
 Thumbs.db
 .vscode/
 .idea/
+
+# Librerías empaquetadas para el navegador (npm run build:vendor)
+vendor/
+
+.claude/settings.local.json
