@@ -37,3 +37,6 @@ vendor/
 .claude/settings.local.json
 
 .playwright-cli
+# Playwright
+test-results/
+playwright-report/

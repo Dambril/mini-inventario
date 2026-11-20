@@ -11,7 +11,8 @@
     "build:vendor": "esbuild zod=node_modules/zod/index.js supabase=node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=esm --minify --log-level=warning --outdir=vendor --out-extension:.js=.mjs",
     "prestart": "npm run build:vendor",
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",
@@ -19,6 +20,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "esbuild": "0.28.2"
   }
 }
