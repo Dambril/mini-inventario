@@ -6,7 +6,7 @@ const MENSAJES = {
   NO_ENCONTRADO: 'Producto no encontrado',
   user_already_exists: 'Ese correo ya tiene una cuenta',
   email_exists: 'Ese correo ya tiene una cuenta',
-  invalid_credentials: 'Correo o contraseña incorrectos',
+  invalid_credentials: 'El correo o la contraseña no son correctos',
   email_not_confirmed: 'Confirma tu correo antes de iniciar sesión',
   weak_password: 'La contraseña es demasiado débil',
   email_address_invalid: 'Escribe un correo válido',

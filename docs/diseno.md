@@ -211,7 +211,7 @@ Los errores de Zod ya vienen en español desde el esquema. Los errores de Supaba
 | Respuesta de Supabase | Mensaje en pantalla |
 |---|---|
 | Auth: `user_already_exists` | "Ese correo ya tiene una cuenta" |
-| Auth: `invalid_credentials` | "Correo o contraseña incorrectos" |
+| Auth: `invalid_credentials` | "El correo o la contraseña no son correctos" |
 | Postgres `23505` (índice de SKU) | "Ya existe un producto con este SKU" |
 | Postgres `23514` (`check`) | error en el campo correspondiente (según el nombre de la restricción) |
 | Función: `STOCK_INSUFICIENTE` | "No hay stock suficiente" |
