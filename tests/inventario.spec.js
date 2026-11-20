@@ -28,7 +28,7 @@ test('rechaza una contraseña incorrecta', async ({ page }) => {
   await page.getByLabel('Contraseña').fill('contraseña-incorrecta-123');
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
-  await expect(page.getByRole('alert').filter({ hasText: 'Correo o contraseña incorrectos' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'El correo o la contraseña no son correctos' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Entra a tu inventario' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Agregar producto' })).toBeHidden();
 });
