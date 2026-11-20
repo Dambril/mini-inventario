@@ -23,7 +23,7 @@ Criterios de aceptación:
 
 1. Con un correo válido no registrado y contraseña de ≥ 8 caracteres, se crea la cuenta y quedo con sesión iniciada en mi inventario (vacío).
 2. Si el correo ya está registrado, veo "Ese correo ya tiene una cuenta" y no se crea otra.
-3. Con correo y contraseña correctos inicio sesión; con cualquiera incorrecto veo "Correo o contraseña incorrectos" (sin indicar cuál falló).
+3. Con correo y contraseña correctos inicio sesión; con cualquiera incorrecto veo "El correo o la contraseña no son correctos" (sin indicar cuál falló).
 4. Al cerrar sesión, abrir la URL del inventario me redirige a la pantalla de inicio de sesión.
 5. La contraseña no se guarda en texto plano (verificable revisando la base de datos).
 
