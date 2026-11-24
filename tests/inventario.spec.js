@@ -60,3 +60,63 @@ test('marca un producto bajo el mínimo', async ({ page }) => {
   await expect(filaBajo).toBeVisible();
   await expect(filaBajo.getByRole('cell', { name: '7', exact: true })).toBeVisible();
 });
+
+test('edita nombre, SKU y mínimo de un producto', async ({ page }) => {
+  const producto = productoDePrueba(10, 3);
+  await iniciarSesion(page);
+  await agregarProducto(page, producto);
+
+  // Los datos nuevos; el SKU nuevo también se borra al terminar.
+  const nuevoSku = skuUnico('EDIT');
+  creados.push(nuevoSku);
+  const nuevoNombre = `Editado ${nuevoSku}`;
+
+  await page.getByRole('row').filter({ hasText: producto.sku })
+    .getByRole('button', { name: 'Editar / movimientos' }).click();
+  const dialogo = page.getByRole('dialog');
+  await expect(dialogo.getByRole('heading', { name: producto.nombre })).toBeVisible();
+
+  await dialogo.getByLabel('Nombre').fill(nuevoNombre);
+  await dialogo.getByLabel('SKU').fill(nuevoSku);
+  await dialogo.getByLabel('Cantidad mínima').fill('15'); // 10 < 15: pasa a "Bajo mínimo"
+  await dialogo.getByRole('button', { name: 'Guardar cambios' }).click();
+
+  await expect(dialogo.getByRole('status').filter({ hasText: 'Cambios guardados.' })).toBeVisible();
+  await expect(dialogo.getByRole('heading', { name: nuevoNombre })).toBeVisible();
+  // La cantidad no cambia al editar.
+  await expect(dialogo.locator('#dialogo-cantidad')).toHaveText('10');
+
+  // La lista refleja los cambios, sin recargar.
+  await dialogo.getByRole('button', { name: 'Cerrar' }).click();
+  const fila = page.getByRole('row').filter({ hasText: nuevoSku });
+  await expect(fila.getByRole('cell', { name: nuevoNombre })).toBeVisible();
+  await expect(fila).toContainText('Bajo mínimo');
+  await expect(page.getByRole('row').filter({ hasText: producto.sku })).toHaveCount(0);
+
+  // Y persiste tras recargar.
+  await page.reload();
+  await expect(page.getByRole('row').filter({ hasText: nuevoSku })).toContainText(nuevoNombre);
+});
+
+test('rechaza editar un producto con un SKU que ya existe', async ({ page }) => {
+  const existente = productoDePrueba(10, 3);
+  const otro = productoDePrueba(10, 3);
+  await iniciarSesion(page);
+  await agregarProducto(page, existente);
+  await agregarProducto(page, otro);
+
+  await page.getByRole('row').filter({ hasText: otro.sku })
+    .getByRole('button', { name: 'Editar / movimientos' }).click();
+  const dialogo = page.getByRole('dialog');
+  await dialogo.getByLabel('SKU').fill(existente.sku);
+  await dialogo.getByRole('button', { name: 'Guardar cambios' }).click();
+
+  // El mensaje va junto al campo SKU (párrafo enlazado al campo, sin rol alert).
+  await expect(dialogo.getByLabel('SKU')).toHaveAttribute('aria-invalid', 'true');
+  await expect(dialogo.getByText('Ya existe un producto con este SKU')).toBeVisible();
+  await expect(dialogo.getByRole('status').filter({ hasText: 'Cambios guardados.' })).toBeHidden();
+
+  // Nada cambió: el producto conserva su SKU original.
+  await dialogo.getByRole('button', { name: 'Cerrar' }).click();
+  await expect(page.getByRole('row').filter({ hasText: otro.sku })).toHaveCount(1);
+});
