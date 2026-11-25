@@ -24,5 +24,4 @@ USER node
 EXPOSE 3000
 
 # SUPABASE_URL, SUPABASE_KEY y PORT se pasan al ejecutar; no van en la imagen.
-RUN npm run no-existe
 CMD ["node", "server.js"]
