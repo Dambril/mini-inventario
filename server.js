@@ -134,7 +134,8 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     process.exit(1);
   }
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`Super Dami escuchando en http://localhost:${PORT}`);
+  // 0.0.0.0: necesario para que el contenedor acepte conexiones desde fuera.
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Super Dami escuchando en 0.0.0.0:${PORT}`);
   });
 }

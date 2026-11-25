@@ -1,0 +1,36 @@
+# Secretos: nunca deben entrar al contexto de build
+.env
+.env.*
+!.env.example
+
+# Dependencias (se instalan dentro de la imagen) y artefactos generados
+node_modules
+vendor
+npm-debug.log*
+test-results
+playwright-report
+.playwright-cli
+
+# Pruebas y entregas
+tests
+entregas
+playwright.config.js
+
+# Git, CI, herramientas locales y otros componentes
+.git
+.github
+.claude
+.mcp.json
+skills-lock.json
+.venv
+mcp-inventario
+docs
+supabase
+
+# Docker y sistema
+Dockerfile
+.dockerignore
+.DS_Store
+Thumbs.db
+.vscode
+.idea
