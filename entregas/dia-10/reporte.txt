@@ -1,0 +1,18 @@
+Hipótesis antes de investigar
+
+Reporte: «Pude guardar un producto con cantidad -5. La lista lo muestra como si nada y el inventario queda mal.»
+
+Creo que este reporte no debería poder ocurrir en la versión actual de la app, porque la cantidad se valida en dos lugares:
+
+En la web: el esquema de Zod (productoNuevo en public/js/esquemas.js) exige que la cantidad sea un entero mayor o igual a 0 y muestra "La cantidad no puede ser negativa". Además, el campo tiene min="0".
+En la base de datos: la tabla productos tiene check (cantidad >= 0) desde la migración del día 4. Aunque alguien se saltara la web y llamara directo a Supabase, la base lo rechazaría.
+
+Si el reporte es real, mis sospechas son:
+
+que en producción esté desplegada una versión vieja de la app, sin la validación de la web;
+que la restricción de la base no se haya aplicado en el proyecto de producción;
+o que el número negativo entre por otro camino, como un movimiento de salida mayor al stock, aunque registrar_movimiento también lo impide.
+
+Si se confirma que ya está bloqueado, pasaré al reporte alterno: «Pude registrar dos productos con el mismo SKU». Ahí creo que pasa lo mismo, porque la base tiene un índice único por usuario (lower(trim(sku))). La única forma de repetir un SKU sería con dos cuentas distintas, y eso es intencional, porque cada usuario tiene su propio inventario.
+
+Cómo lo voy a comprobar: reproduciéndolo en la URL pública con playwright-cli, revisando los logs con el MCP de Render y consultando los datos con supabase-lectura, para ver si hay filas con cantidad negativa o SKU repetidos.

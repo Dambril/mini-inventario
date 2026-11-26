@@ -73,6 +73,12 @@ create unique index productos_user_sku_unico on productos (user_id, lower(trim(s
 
 - `cantidad` es el stock actual. Se fija al crear el producto y después solo la modifica la función `registrar_movimiento`.
 - El SKU es único por usuaria y no distingue mayúsculas de minúsculas (`abc-1` y `ABC-1` se consideran el mismo).
+- El SKU solo se guarda **normalizado**, para que dos SKU que se ven iguales no puedan ser distintos. La web lo normaliza (`normalizarSku` en `esquemas.js`) y la base rechaza el que no lo esté (`check productos_sku_normalizado`, migración `002_sku_normalizado.sql`). La regla, en orden:
+  1. Quitar los caracteres invisibles: U+00AD, U+180E, U+200B–U+200F, U+202A–U+202E, U+2060–U+2064, U+2066–U+2069 y U+FEFF.
+  2. Unificar la forma Unicode (NFC).
+  3. Convertir cada grupo de espacios en un solo espacio: U+0009–U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F y U+3000.
+  4. Quitar el espacio inicial y el final.
+- La regla no equipara letras parecidas de otros alfabetos (una `А` cirílica y una `A` latina siguen siendo distintas).
 - `integer` rechaza los decimales: Postgres no convierte en silencio un `2.5` enviado como cantidad.
 
 ### 4.2 Tabla `movimientos` (necesaria para HU4)
@@ -149,7 +155,7 @@ Todos los datos que entran a la aplicación se describen con un esquema de **Zod
 | Esquema | Uso | Reglas |
 |---|---|---|
 | `credenciales` | registro e inicio de sesión (HU1) | `email` válido; `password` de 8 a 72 caracteres (72 es el límite de bcrypt) |
-| `productoNuevo` | alta (HU2) | `nombre` 1–100 y `sku` 1–50 tras quitar espacios; `cantidad` y `minimo` enteros ≥ 0 |
+| `productoNuevo` | alta (HU2) | `nombre` 1–100 tras quitar espacios; `sku` 1–50 tras normalizarlo (sección 4.1); `cantidad` y `minimo` enteros ≥ 0 |
 | `productoEdicion` | edición (HU3) | `nombre`, `sku` y `minimo` con las mismas reglas; **`.strict()`**, así que enviar `cantidad` es un error |
 | `movimiento` | entradas y salidas (HU4) | `producto_id` uuid; `tipo` `entrada` o `salida`; `unidades` entero > 0; `nota` opcional ≤ 200 |
 | `idProducto` | parámetro `?id=` de `producto.html` | uuid; si no lo es, "Producto no encontrado" sin consultar a Supabase |
@@ -197,7 +203,7 @@ Es la capa que garantiza las reglas aunque alguien se salte el navegador (por ej
 | Sin sesión no se lee nada | permisos de `anon` + RLS | HU1-4 |
 | Nombre y SKU no vacíos, longitudes máximas | `check` en `productos` | HU2-2, HU3-2 |
 | Cantidad y mínimo enteros ≥ 0 | tipo `integer` + `check` | HU2-3, HU3-2 |
-| SKU único por usuaria | índice único `(user_id, lower(trim(sku)))` | HU2-4, HU3-2 |
+| SKU único por usuaria | índice único `(user_id, lower(trim(sku)))` + `check productos_sku_normalizado` | HU2-4, HU3-2 |
 | Cada quien ve y edita solo lo suyo | RLS (`user_id = auth.uid()`) | HU2-5, HU3-5 |
 | La cantidad no se edita directamente | `grant update` sin la columna `cantidad` | HU3-3 |
 | Unidades > 0, tipo válido, sin stock negativo, todo o nada | `registrar_movimiento` + `check` | HU4-1, HU4-2, HU4-5 |
