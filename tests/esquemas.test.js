@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validar, credenciales, productoNuevo, productoEdicion, movimiento, idProducto, LIMITES } from '../public/js/esquemas.js';
+import { readFileSync } from 'node:fs';
+import { validar, credenciales, productoNuevo, productoEdicion, movimiento, idProducto, LIMITES, normalizarSku } from '../public/js/esquemas.js';
 
 const valido = { nombre: 'Café 500 g', sku: 'CAF-500', cantidad: '10', minimo: '3' };
 
@@ -39,6 +40,44 @@ test('respeta los límites de longitud', () => {
   assert.equal(validar(productoNuevo, { ...valido, nombre: 'a'.repeat(LIMITES.nombre) }).ok, true);
   assert.equal(validar(productoNuevo, { ...valido, nombre: 'a'.repeat(LIMITES.nombre + 1) }).ok, false);
   assert.equal(validar(productoNuevo, { ...valido, sku: 'a'.repeat(LIMITES.sku + 1) }).ok, false);
+});
+
+for (const [caso, entrada, esperado] of [
+  ['recorta los extremos', '  ABC-1  ', 'ABC-1'],
+  ['quita el tabulador y el salto de línea', 'ABC-1\t\n', 'ABC-1'],
+  ['quita los caracteres invisibles', '\u{202E}AB\u{00AD}C\u{200D}-1\u{200B}\u{FEFF}', 'ABC-1'],
+  ['deja un solo espacio interno', 'ABC \t\u{00A0}\u{3000} 1', 'ABC 1'],
+  ['unifica la forma Unicode', 'Cafe\u{0301}', 'Caf\u{00E9}'],
+  ['compone aunque haya un invisible en medio', 'e\u{200B}\u{0301}', '\u{00E9}'],
+  ['conserva mayúsculas, acentos y un espacio', 'Ñandú vsx 5', 'Ñandú vsx 5'],
+]) {
+  test(`normalizarSku ${caso}`, () => {
+    assert.equal(normalizarSku(entrada), esperado);
+    assert.equal(normalizarSku(esperado), esperado);
+    assert.equal(validar(productoNuevo, { ...valido, sku: entrada }).datos.sku, esperado);
+    assert.equal(validar(productoEdicion, { nombre: 'A', sku: entrada, minimo: '1' }).datos.sku, esperado);
+  });
+}
+
+test('un SKU de solo caracteres invisibles es obligatorio', () => {
+  const r = validar(productoNuevo, { ...valido, sku: ' \u{200B}\u{2060} ' });
+  assert.equal(r.errores.sku, 'Este campo es obligatorio');
+});
+
+test('el límite del SKU se mide después de normalizar', () => {
+  assert.equal(validar(productoNuevo, { ...valido, sku: 'a'.repeat(LIMITES.sku) + '\u{200B}' }).ok, true);
+});
+
+test('la regla del SKU usa los mismos caracteres en JavaScript y en SQL', () => {
+  const leer = (ruta) => readFileSync(new URL(ruta, import.meta.url), 'utf8');
+  const js = leer('../public/js/esquemas.js');
+  const sql = leer('../supabase/migrations/002_sku_normalizado.sql');
+  // De cada clase de caracteres (invisibles y espacios) deja los códigos y los rangos.
+  const codigos = (clase) => clase.match(/[0-9A-F]{4}|-/g).join(' ');
+  const enJs = [...js.matchAll(/^const (?:INVISIBLES|ESPACIOS) = \/\[(.+)\]/gm)].map((m) => codigos(m[1]));
+  const enSql = [...sql.matchAll(/'\[(\\x.+)\]\+?'/g)].map((m) => codigos(m[1]));
+  assert.equal(enJs.length, 2);
+  assert.deepEqual(enSql, enJs);
 });
 
 test('los campos desconocidos son un error', () => {

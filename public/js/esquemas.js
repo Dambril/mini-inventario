@@ -15,6 +15,25 @@ function limpiarTexto(valor) {
   return recortado === '' ? undefined : recortado;
 }
 
+// Regla del SKU. Es la misma del check productos_sku_normalizado
+// (supabase/migrations/002_sku_normalizado.sql): si cambia aquí, cambia allá.
+// Los caracteres van escapados para no dejar invisibles en el archivo.
+const INVISIBLES = /[\u{00AD}\u{180E}\u{200B}-\u{200F}\u{202A}-\u{202E}\u{2060}-\u{2064}\u{2066}-\u{2069}\u{FEFF}]/gu;
+const ESPACIOS = /[\u{0009}-\u{000D}\u{0020}\u{0085}\u{00A0}\u{1680}\u{2000}-\u{200A}\u{2028}\u{2029}\u{202F}\u{205F}\u{3000}]+/gu;
+
+// Dos SKU que se ven iguales quedan iguales. No cambia mayúsculas: de eso se
+// encarga el índice único de la base de datos.
+export function normalizarSku(sku) {
+  return sku.replace(INVISIBLES, '').normalize('NFC').replace(ESPACIOS, ' ').replace(/^ | $/g, '');
+}
+
+// Como limpiarTexto, pero con la regla del SKU.
+function limpiarSku(valor) {
+  if (typeof valor !== 'string') return valor;
+  const normalizado = normalizarSku(valor);
+  return normalizado === '' ? undefined : normalizado;
+}
+
 // Solo convierte lo que parece número; "abc" sigue siendo texto y el esquema lo rechaza.
 function limpiarNumero(valor) {
   const limpio = limpiarTexto(valor);
@@ -25,9 +44,9 @@ function limpiarNumero(valor) {
 // Los mensajes se muestran junto a su campo, así que no necesitan nombrarlo.
 const OBLIGATORIO = 'Este campo es obligatorio';
 
-const texto = (max) =>
+const texto = (max, limpiar = limpiarTexto) =>
   z.preprocess(
-    limpiarTexto,
+    limpiar,
     z
       .string({ error: (iss) => (iss.input === undefined ? OBLIGATORIO : 'Escribe un texto') })
       .max(max, `Admite como máximo ${max} caracteres`),
@@ -57,7 +76,7 @@ export const credenciales = z.strictObject({
 
 export const productoNuevo = z.strictObject({
   nombre: texto(LIMITES.nombre),
-  sku: texto(LIMITES.sku),
+  sku: texto(LIMITES.sku, limpiarSku),
   cantidad: entero(0, 'La cantidad no puede ser negativa'),
   minimo: entero(0, 'El mínimo no puede ser negativo'),
 });
